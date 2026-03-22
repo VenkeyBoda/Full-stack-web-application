@@ -1,4 +1,4 @@
-name: DevOps CI/CD Pipeline
+name: Docker Image build and push CI
 
 on:
   push:
@@ -6,7 +6,35 @@ on:
 
 jobs:
 
+  changes:
+
+    runs-on: ubuntu-latest
+    outputs:
+      run_ci: ${{ steps.filter.outputs.ci }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+  
+      - name: Filter changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ci:
+              - 'backend/**'
+              - 'database/**'
+              - 'frontend/**'
+              - 'Dockerfile'  
+
+# =========================
+# CI JOB
+# =========================
+
   build-and-push:
+    needs: changes
+    if: needs.changes.outputs.run_ci == 'true'
+    
     runs-on: ubuntu-latest
 
     steps:
@@ -36,6 +64,7 @@ jobs:
   terraform:
     runs-on: ubuntu-latest    
     needs: build-and-push
+    if: always()
 
     steps:
 
@@ -66,6 +95,16 @@ jobs:
         working-directory: Infra
         run: terraform apply -auto-approve tfplan
 
+
+  deploy-kubernetes:
+    runs-on: ubuntu-latest
+    needs: terraform
+    if: always()
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4  
 
@@ -87,14 +126,6 @@ jobs:
         run: |
             kubectl cluster-info
             kubectl get nodes
-
-
-  deploy-kubernetes:
-    runs-on: ubuntu-latest
-    needs: terraform
-
-    steps:
-      - uses: actions/checkout@v4
 
       - name: Deploy to Kubernetes
         run: |
