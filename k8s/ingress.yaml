@@ -1,37 +1,30 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
-
 metadata:
   name: devops-app-ingress
   namespace: devops-app
 
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-
 spec:
-
   ingressClassName: nginx
 
   rules:
-
   - http:
-
       paths:
 
-      - path: /
-        pathType: Prefix
-
-        backend:
-          service:
-            name: frontend-service
-            port:
-              number: 80
-
+      # Backend API FIRST (important order)
       - path: /api
-        pathType: Prefix
-
+        pathType:  Prefix
         backend:
           service:
             name: backend-service
             port:
               number: 5000
+
+      # Frontend SECOND
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80

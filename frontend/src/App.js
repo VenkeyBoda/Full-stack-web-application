@@ -8,12 +8,12 @@ function App() {
   const [email,setEmail] = useState("");
 
   const fetchUsers = async () => {
-    const res = await axios.get("/api/users");   // 👈 CHANGE
+    const res = await axios.get("/api/users"); 
     setUsers(res.data);
   };
 
   const addUser = async () => {
-    await axios.post("/api/users",{name,email}); // 👈 CHANGE
+    await axios.post("/api/users",{name,email});
     fetchUsers();
   };
 
