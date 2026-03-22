@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
+const API = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 function App() {
+
   const [users,setUsers] = useState([]);
   const [name,setName] = useState("");
   const [email,setEmail] = useState("");
 
   const fetchUsers = async () => {
-    const res = await axios.get("http://localhost:5000/users");
+    const res = await axios.get(`${API}/users`);
     setUsers(res.data);
   };
 
   const addUser = async () => {
-    await axios.post("http://localhost:5000/users",{name,email});
+    await axios.post(`${API}/users`, {name,email});
     fetchUsers();
   };
 

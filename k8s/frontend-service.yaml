@@ -4,7 +4,7 @@ metadata:
   name: frontend-service
   namespace: devops-app
 spec:
-  type: NodePort
+  type: LoadBalancer
   selector:
     app: frontend
   ports:
