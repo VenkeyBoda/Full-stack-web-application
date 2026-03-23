@@ -140,11 +140,13 @@ jobs:
               echo "Ingress controller already exists"
             fi
       
-      - name: Deploy to Kubernetes
+      - name: Create Namespace
         run: |
           kubectl apply -f k8s/namespace.yaml
-          kubectl wait --for=condition=Active namespace/devops-app  --timeout=30s
-
+          kubectl wait --for=condition=Active namespace/devops-app  --timeout=60s
+      
+      - name: Deploy backend and frontend
+        run: |
           kubectl apply -f k8s/postgres-configmap.yaml
 
           kubectl apply -f k8s/database
