@@ -182,11 +182,15 @@ kubectl logs -f deployment/backend -n <namespace>
 ```bash
 http://<<ingress-ip>>/api/users
 ```
+![Frontend UI](docs/backend.jpg)
+![Frontend UI](docs/backend_users.jpg)
 
 ### frontend
 ```bash
 http://<<ingress-ip>>
 ```
+![Frontend UI](docs/frontend.jpg)
+![Frontend UI](docs/frontend_users.jpg)
 
 ## Contribution and Usage
     - If you want to contribute: open an issue or PR describing the change.
