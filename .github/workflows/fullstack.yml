@@ -91,18 +91,11 @@ jobs:
           kubectl cluster-info
           kubectl get nodes
 
-      - name: Create vcluster
-        run: |
-          kubectl create namespace vcluster-ns || true
-          vcluster create demo-cluster --namespace vcluster-ns
-          vcluster connect demo-cluster --namespace vcluster-ns &
-
       # ---------- Create vcluster on kind ----------
       - name: Create vcluster
         run: |
           kubectl create namespace vcluster-ns || true
-          vcluster create demo-cluster --namespace vcluster-ns --autonodes=false
-          # Connect kubectl to vcluster
+          vcluster create demo-cluster --namespace vcluster-ns
           vcluster connect demo-cluster --namespace vcluster-ns &
 
       # ---------- Install ingress if missing ----------
