@@ -94,7 +94,7 @@ jobs:
       - name: Create vcluster
         run: |
           kubectl create namespace vcluster-ns || true
-          vcluster create demo-cluster --namespace vcluster-ns --autonodes=false
+          vcluster create demo-cluster --namespace vcluster-ns
           vcluster connect demo-cluster --namespace vcluster-ns &
 
       # ---------- Create vcluster on kind ----------
