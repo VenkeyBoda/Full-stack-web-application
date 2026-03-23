@@ -119,7 +119,13 @@ jobs:
           kubectl apply -f k8s/backend
           kubectl apply -f k8s/frontend
 
-          kubectl apply -f k8s/Ingress
+      - name: Wait for ingress controller
+        run: |
+            kubectl -n ingress-nginx wait --for=condition=Ready pod -l app.kubernetes.io/component=controller --timeout=120s
+      
+      - name: Apply Ingress
+        run: |  
+            kubectl apply -f k8s/Ingress
 
 
   # terraform:
