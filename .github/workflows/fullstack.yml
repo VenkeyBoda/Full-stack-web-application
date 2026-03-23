@@ -26,6 +26,8 @@ jobs:
               - 'database/**'
               - 'frontend/**'
               - 'Dockerfile'
+              - 'Infra/**'
+              - 'k8s/**'
 
 # =========================
 # CI JOB
@@ -140,13 +142,12 @@ jobs:
               echo "Ingress controller already exists"
             fi
       
-      - name: Create Namespace
+      - name: Deploy Kubernetes resources
         run: |
           kubectl apply -f k8s/namespace.yaml
-          kubectl wait --for=condition=Active namespace/devops-app  --timeout=60s
-      
-      - name: Deploy backend and frontend
-        run: |
+          
+          sleep 20s
+
           kubectl apply -f k8s/postgres-configmap.yaml
 
           kubectl apply -f k8s/database
