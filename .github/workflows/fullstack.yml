@@ -25,7 +25,7 @@ jobs:
               - 'backend/**'
               - 'database/**'
               - 'frontend/**'
-              - 'Dockerfile'  
+              - 'Dockerfile'
 
 # =========================
 # CI JOB
@@ -61,56 +61,89 @@ jobs:
 # CD JOB
 # =========================
 
-  deploy:
-    runs-on: ubuntu-latest
+  terraform:
+    runs-on: ubuntu-latest    
+    needs: build-and-push
+    if: always()
 
     steps:
-      - name: Checkout code
+
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # ---------- Setup kubectl ----------
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
-
-      # ---------- Install vcluster CLI ----------
-      - name: Install vcluster CLI
-        run: |
-          curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64"
-          sudo install -c -m 0755 vcluster /usr/local/bin
-          rm -f vcluster
-
-      # ---------- Setup kind (host cluster for vcluster) ----------
-     # Install a Kind host cluster
-      - name: Create Kubernetes kind host cluster
-        uses: container-tools/kind-action@v2
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-           version: v0.20.0
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Verify kind host cluster
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: Infra
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: Infra
         run: |
-          kubectl cluster-info
-          kubectl get nodes
+          terraform plan \
+              -var-file="terraform.tfvars" \
+              -input=false \
+              -out=tfplan
 
-      # ---------- Create vcluster on kind ----------
-      - name: Create vcluster
+      - name: Terraform Apply
+        working-directory: Infra
+        run: terraform apply -auto-approve tfplan
+
+
+  deploy-kubernetes:
+    runs-on: ubuntu-latest
+    needs: terraform
+    if: always()
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+ 
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4  
+
+      - name: Get AKS credentials
         run: |
-          kubectl create namespace vcluster-ns || true
-          vcluster create demo-cluster --namespace vcluster-ns
-          vcluster connect demo-cluster --namespace vcluster-ns &
+          az aks get-credentials \
+          --resource-group ${{ vars.RG_NAME }} \
+          --name ${{ vars.AKS_NAME }} \
+          --overwrite-existing  
 
-      # ---------- Install ingress if missing ----------
-      - name: Install ingress controller
+      - name: Wait cluster ready
         run: |
-          if ! kubectl get deployment ingress-nginx-controller -n ingress-nginx; then
-            kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
-          else
-            echo "Ingress controller already exists"
-          fi
+            az aks wait \
+            --resource-group ${{ vars.RG_NAME }} \
+            --name ${{ vars.AKS_NAME }} \
+            --created
 
-      # ---------- Deploy your app ----------
+      - name: Verify cluster
+        run: |
+            kubectl cluster-info
+            kubectl get nodes
+
+      - name: Install ingress if missing
+        run: |
+            if ! kubectl get deployment ingress-nginx-controller -n ingress-nginx; then
+              kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+            else
+              echo "Ingress controller already exists"
+            fi
+      
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f k8s/namespace.yaml
+          kubectl wait --for=condition=Active namespace/devops-app  --timeout=30s
 
           kubectl apply -f k8s/postgres-configmap.yaml
 
@@ -119,121 +152,5 @@ jobs:
           kubectl apply -f k8s/backend
           kubectl apply -f k8s/frontend
 
-      - name: Wait for ingress controller
-        run: |
-            kubectl -n ingress-nginx wait --for=condition=Ready pod -l app.kubernetes.io/component=controller --timeout=120s
-      
-      - name: Apply Ingress
-        run: |  
-            kubectl apply -f k8s/Ingress
-
-      - name: Print frontend URL
-        run: |
-              NODEPORT=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}')
-              echo "Frontend URL (localhost in runner): http://127.0.0.1:$NODEPORT"
-  # terraform:
-  #   runs-on: ubuntu-latest    
-  #   needs: build-and-push
-  #   if: always()
-
-  #   steps:
-
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-
-  #     - name: Azure Login
-  #       uses: azure/login@v2
-  #       with:
-  #         creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-  #     - name: Setup Terraform
-  #       uses: hashicorp/setup-terraform@v3
-
-  #     - name: Terraform Init
-  #       working-directory: Infra
-  #       run: terraform init
-
-  #     - name: Terraform Plan
-  #       working-directory: Infra
-  #       run: |
-  #         terraform plan \
-  #             -var-file="terraform.tfvars" \
-  #             -input=false \
-  #             -out=tfplan
-
-  #     - name: Terraform Apply
-  #       working-directory: Infra
-  #       run: terraform apply -auto-approve tfplan
-
-
-  # deploy-kubernetes:
-  #   runs-on: ubuntu-latest
-  #   # needs: terraform
-  #   # if: always()
-
-  #   steps:
-  #     - name: checkout
-  #       uses: actions/checkout@v4
- 
-  #     # - name: Azure Login
-  #     #   uses: azure/login@v2
-  #     #   with:
-  #     #     creds: ${{ secrets.AZURE_CREDENTIALS }}
-        
-  #     - name: Setup kubectl
-  #       uses: azure/setup-kubectl@v4  
-
-
-  #     - name: Install vcluster CLI
-  #       run: |
-  #         curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64"
-  #         sudo install -c -m 0755 vcluster /usr/local/bin
-  #         rm -f vcluster
-
-  #    # ---------- Create vcluster (VIND mode) ----------
-  #     - name: Create vcluster
-  #       run: |
-  #         vcluster use driver docker
-  #         vcluster create demo-cluster
-
-  #     # - name: Get AKS credentials
-  #     #   run: |
-  #     #     az aks get-credentials \
-  #     #     --resource-group ${{ vars.RG_NAME }} \
-  #     #     --name ${{ vars.AKS_NAME }} \
-  #     #     --overwrite-existing  
-
-  #     # - name: Wait cluster ready
-  #     #   run: |
-  #     #       az aks wait \
-  #     #       --resource-group ${{ vars.RG_NAME }} \
-  #     #       --name ${{ vars.AKS_NAME }} \
-  #     #       --created
-
-  #     # - name: Verify cluster
-  #     #   run: |
-  #     #       kubectl cluster-info
-  #     #       kubectl get nodes
-
-  #     - name: Install ingress if missing
-  #       run: |
-  #           if ! kubectl get deployment ingress-nginx-controller -n ingress-nginx; then
-  #             kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
-  #           else
-  #             echo "Ingress controller already exists"
-  #           fi
-      
-  #     - name: Deploy to Kubernetes
-  #       run: |
-  #         kubectl apply -f k8s/namespace.yaml
-  #         kubectl wait --for=condition=Active namespace/devops-app  --timeout=30s
-
-  #         kubectl apply -f k8s/postgres-configmap.yaml
-
-  #         kubectl apply -f k8s/database
-
-  #         kubectl apply -f k8s/backend
-  #         kubectl apply -f k8s/frontend
-
-  #         kubectl apply -f k8s/Ingress
+          kubectl apply -f k8s/Ingress
 

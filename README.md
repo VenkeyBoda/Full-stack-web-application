@@ -128,8 +128,18 @@ docker run --name dev-postgres \
   -e POSTGRES_PASSWORD=mypassword \
   -d postgres:15
 ```  
+### 5. check url for backend
 
-## Deploying to Kubernetes (via CI/CD)
+```bash
+http://localhost:5000/api/users
+```
+
+### 6. check url for frontend
+
+```bash
+http://localhost:80
+```
+## Deploying to Kubernetes via Github Actions (via CI/CD)
 
 ### Deployment happens automatically when:
 
@@ -166,9 +176,20 @@ kubectl get services -n <namespace>
 kubectl get ingress -n <namespace>
 kubectl logs -f deployment/backend -n <namespace>
 ```
+## check the ingress loadbalncer ip
+
+### backend
+```bash
+http://<<ingress-ip>>/api/users
+```
+
+### frontend
+```bash
+http://<<ingress-ip>>
+```
 
 ## Contribution and Usage
-    -  If you want to contribute: open an issue or PR describing the change.
+    - If you want to contribute: open an issue or PR describing the change.
     - If you want to fork or reuse: follow the license (see below).
     - If you want to customize deployment: adjust the Terraform configs in Infra/  and Kubernetes manifests in k8s/.
 
@@ -186,4 +207,3 @@ text
 2. Paste the above content.  
 3. Replace placeholder text (tech stack, repo name, license file path, etc.) with your actual values.
 
-If you tell me your tech stack (e.g., “Node.js + React + PostgreSQL”), I can tweak the text to match exactly what you’re using.
