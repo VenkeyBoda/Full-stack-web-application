@@ -61,76 +61,89 @@ jobs:
 # CD JOB
 # =========================
 
-  terraform:
-    runs-on: ubuntu-latest    
-    needs: build-and-push
-    if: always()
+  # terraform:
+  #   runs-on: ubuntu-latest    
+  #   needs: build-and-push
+  #   if: always()
 
-    steps:
+  #   steps:
 
-      - name: Checkout
-        uses: actions/checkout@v4
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+  #     - name: Azure Login
+  #       uses: azure/login@v2
+  #       with:
+  #         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+  #     - name: Setup Terraform
+  #       uses: hashicorp/setup-terraform@v3
 
-      - name: Terraform Init
-        working-directory: Infra
-        run: terraform init
+  #     - name: Terraform Init
+  #       working-directory: Infra
+  #       run: terraform init
 
-      - name: Terraform Plan
-        working-directory: Infra
-        run: |
-          terraform plan \
-              -var-file="terraform.tfvars" \
-              -input=false \
-              -out=tfplan
+  #     - name: Terraform Plan
+  #       working-directory: Infra
+  #       run: |
+  #         terraform plan \
+  #             -var-file="terraform.tfvars" \
+  #             -input=false \
+  #             -out=tfplan
 
-      - name: Terraform Apply
-        working-directory: Infra
-        run: terraform apply -auto-approve tfplan
+  #     - name: Terraform Apply
+  #       working-directory: Infra
+  #       run: terraform apply -auto-approve tfplan
 
 
   deploy-kubernetes:
     runs-on: ubuntu-latest
-    needs: terraform
-    if: always()
+    # needs: terraform
+    # if: always()
 
     steps:
       - name: checkout
         uses: actions/checkout@v4
  
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      # - name: Azure Login
+      #   uses: azure/login@v2
+      #   with:
+      #     creds: ${{ secrets.AZURE_CREDENTIALS }}
         
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4  
 
-      - name: Get AKS credentials
-        run: |
-          az aks get-credentials \
-          --resource-group ${{ vars.RG_NAME }} \
-          --name ${{ vars.AKS_NAME }} \
-          --overwrite-existing  
 
-      - name: Wait cluster ready
+      - name: Install vcluster CLI
         run: |
-            az aks wait \
-            --resource-group ${{ vars.RG_NAME }} \
-            --name ${{ vars.AKS_NAME }} \
-            --created
+          curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64"
+          sudo install -c -m 0755 vcluster /usr/local/bin
+          rm -f vcluster
 
-      - name: Verify cluster
+     # ---------- Create vcluster (VIND mode) ----------
+      - name: Create vcluster
         run: |
-            kubectl cluster-info
-            kubectl get nodes
+          vcluster use driver docker
+          vcluster create demo-cluster
+
+      # - name: Get AKS credentials
+      #   run: |
+      #     az aks get-credentials \
+      #     --resource-group ${{ vars.RG_NAME }} \
+      #     --name ${{ vars.AKS_NAME }} \
+      #     --overwrite-existing  
+
+      # - name: Wait cluster ready
+      #   run: |
+      #       az aks wait \
+      #       --resource-group ${{ vars.RG_NAME }} \
+      #       --name ${{ vars.AKS_NAME }} \
+      #       --created
+
+      # - name: Verify cluster
+      #   run: |
+      #       kubectl cluster-info
+      #       kubectl get nodes
 
       - name: Install ingress if missing
         run: |
@@ -142,6 +155,15 @@ jobs:
       
       - name: Deploy to Kubernetes
         run: |
-          kubectl apply -f k8s/
-      
-          
+          kubectl apply -f k8s/namespace.yaml
+          kubectl wait --for=condition=Active namespace/devops-app  --timeout=30s
+
+          kubectl apply -f k8s/postgres-configmap.yaml
+
+          kubectl apply -f k8s/database
+
+          kubectl apply -f k8s/backend
+          kubectl apply -f k8s/frontend
+
+          kubectl apply -f k8s/Ingress
+

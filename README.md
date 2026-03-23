@@ -1,19 +1,189 @@
-# Fullstack DevOps Sample Project
+# Full‑Stack Web Application with CI/CD
 
-Stack:
-- React Frontend
-- Node.js (Express) Backend
-- PostgreSQL Database
-- Docker & Docker Compose
-- Kubernetes manifests
-- Terraform (basic placeholder)
-- Bitbucket Pipelines CI/CD
+A full‑stack web application with **backend API**, **frontend UI**, and **PostgreSQL database**, deployed to **Kubernetes on Azure AKS** using an automated GitHub Actions pipeline with Docker and Terraform.
 
-## Run locally
+## Overview
+
+This repo contains:
+- `backend/` – Backend API (Node.js / Python / Go, etc.)
+- `frontend/` – Frontend application (React / Vue / Angular)
+- `database/` – Database schema and migrations
+- `Infra/` – Terraform scripts to provision Azure resources (AKS, ACR, networking)
+- `k8s/` – Kubernetes manifests for deployments, services, and ingress
+- `.github/workflows/` – CI/CD pipeline for build, push, and deploy
+
+The pipeline:
+- Builds and pushes Docker images to **Docker Hub** on relevant changes.
+- Applies **Terraform** to manage Azure infrastructure.
+- Deploys the application to **Azure Kubernetes Service (AKS)** using `kubectl`.
+
+---
+
+## Architecture
+
+- Backend: exposed via Kubernetes `Service` and `Ingress`
+- Frontend: served via Kubernetes, routed through NGINX Ingress
+- PostgreSQL: deployed as a Kubernetes `Deployment` with `ConfigMap` and `Service`
+- CI/CD: GitHub Actions on `push` to `main`, with conditional runs based on file changes
+
+---
+
+## Key Files
+
+| Directory / File | Purpose |
+|------------------|---------|
+| `backend/` | Backend API code |
+| `frontend/` | Frontend SPA code |
+| `database/` | SQL scripts, migrations |
+| `Dockerfile` | Multi‑stage Docker build for backend/frontend |
+| `Infra/terraform.tfvars` | Terraform variables for Azure resources |
+| `Infra/main.tf`, `Infra/aks.tf` | Terraform config for AKS and infra |
+| `k8s/namespace.yaml` | Kubernetes application namespace |
+| `k8s/postgres-*.yaml` | PostgreSQL deployment, service, and config |
+| `k8s/backend-*.yaml` | Backend deployment and service |
+| `k8s/frontend-*.yaml` | Frontend deployment and service |
+| `k8s/ingress.yaml` | Ingress routing for backend/frontend |
+
+---
+
+## CI/CD Pipeline
+
+The GitHub Actions workflow:
+
+1. **`changes` job**  
+   - Filters changes using `dorny/paths-filter`.  
+   - Triggers CI only when files under `backend/**`, `frontend/**`, `database/**`, or `Dockerfile` change.
+
+2. **`build-and-push` job**  
+   - Checks out the code.
+   - Logs into **Docker Hub** using `secrets.DOCKER_USERNAME` and `secrets.DOCKER_PASSWORD`.
+   - Builds:
+     - `backend:latest` image from `./backend`
+     - `frontend:latest` image from `./frontend`
+   - Pushes both images to Docker Hub.
+
+3. **`terraform` job**  
+   - Runs after `build-and-push`.
+   - Logs into **Azure** using `secrets.AZURE_CREDENTIALS`.
+   - Uses `hashicorp/setup-terraform@v3`.
+   - Runs `terraform init`, `terraform plan`, and `terraform apply -auto-approve` inside `Infra/`.
+
+4. **`deploy-kubernetes` job**  
+   - Runs after Terraform completes.
+   - Logs into Azure and AKS using `az aks get-credentials`.
+   - Waits for cluster readiness.
+   - Installs NGINX Ingress (if not present).
+   - Applies all manifests in the `k8s/` directory.
+
+---
+
+## Secrets and Variables
+
+In GitHub, you must set these **secrets**:
+
+- `DOCKER_USERNAME` – Docker Hub username
+- `DOCKER_PASSWORD` – Docker Hub password or access token
+- `AZURE_CREDENTIALS` – Azure Service Principal JSON for AKS access
+     {
+        "clientSecret":  "your-secret-id",
+        "subscriptionId":  "your-sub-id",
+        "tenantId":  "your-tenant-id",
+        "clientId":  "your-clinet-id"
+     }
+
+In GitHub **Repository Variables** (or workflow):
+
+- `RG_NAME` – Azure Resource Group name
+- `AKS_NAME` – AKS cluster name
+
+---
+
+## How to Run Locally
+
+### 1. Clone the repo
 
 ```bash
-docker-compose up --build
+git clone <your-repo-url>
+cd <project-name>
+```
+### 2. Backend (example Node.js)
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+### 3. Frontend (example React)
+
+```bash
+cd frontend
+npm install
+npm start
+```
+### 4. Database (example PostgreSQL)
+
+```bash
+docker run --name dev-postgres \
+  -p 5432:5432 \
+  -e POSTGRES_PASSWORD=mypassword \
+  -d postgres:15
+```  
+
+## Deploying to Kubernetes (via CI/CD)
+
+### Deployment happens automatically when:
+
+    - You push to the main branch, and
+
+    - Changes are detected in backend/**, frontend/**, database/**, or Dockerfile.
+
+### What happens in the pipeline:
+    - New Docker images are built and pushed.
+    - Terraform updates the Azure infrastructure (AKS, networking, etc.).
+    - Kubernetes manifests in k8s/ are applied to AKS.
+    - NGINX Ingress routes traffic to backend and frontend.
+
+### To trigger a deployment:
+
+```bash
+# Make changes, then push
+git add .
+git commit -m "Update backend and frontend"
+git push origin main
+```
+Then view the GitHub Actions workflow runs to see status.
+
+## How to Check Status in Kubernetes
+### After deployment, from your local machine:
+
+```bash
+az aks get-credentials \
+  --resource-group $RG_NAME \
+  --name $AKS_NAME
+
+kubectl get pods -n <namespace>
+kubectl get services -n <namespace>
+kubectl get ingress -n <namespace>
+kubectl logs -f deployment/backend -n <namespace>
 ```
 
-Frontend: http://localhost:3000  
-Backend: http://localhost:5000/users
+## Contribution and Usage
+    -  If you want to contribute: open an issue or PR describing the change.
+    - If you want to fork or reuse: follow the license (see below).
+    - If you want to customize deployment: adjust the Terraform configs in Infra/  and Kubernetes manifests in k8s/.
+
+📄 License
+This project is licensed under the MIT License. See the LICENSE file for details.
+MIT License [web:1][web:6]
+
+text
+
+***
+
+### How to place this in your repo
+
+1. In your repo root, create or edit: `README.md`  
+2. Paste the above content.  
+3. Replace placeholder text (tech stack, repo name, license file path, etc.) with your actual values.
+
+If you tell me your tech stack (e.g., “Node.js + React + PostgreSQL”), I can tweak the text to match exactly what you’re using.

@@ -30,3 +30,4 @@ spec:
 
             - name: DB_NAME
               value: usersdb
+
