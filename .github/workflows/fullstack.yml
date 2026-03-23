@@ -66,15 +66,11 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # ---------- Setup kubectl ----------
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
-
-      # ---------- Install Docker CLI (required by kind) ----------
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v2
 
       # ---------- Install vcluster CLI ----------
       - name: Install vcluster CLI
@@ -84,16 +80,22 @@ jobs:
           rm -f vcluster
 
       # ---------- Setup kind (host cluster for vcluster) ----------
-      - name: Setup kind cluster
-        uses: engineerd/setup-kind@v0.11.1
+     # Install a Kind host cluster
+      - name: Create Kubernetes kind host cluster
+        uses: container-tools/kind-action@v2
         with:
-          version: v0.26.0
+           version: v0.20.0
 
-      - name: Create kind host cluster
+      - name: Verify kind host cluster
         run: |
-          kind create cluster --name host-cluster
           kubectl cluster-info
           kubectl get nodes
+
+      - name: Create vcluster
+        run: |
+          kubectl create namespace vcluster-ns || true
+          vcluster create demo-cluster --namespace vcluster-ns --autonodes=false
+          vcluster connect demo-cluster --namespace vcluster-ns &
 
       # ---------- Create vcluster on kind ----------
       - name: Create vcluster
