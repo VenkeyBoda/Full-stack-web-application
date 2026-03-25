@@ -106,38 +106,94 @@ In GitHub **Repository Variables** (or workflow):
 git clone <your-repo-url>
 cd <project-name>
 ```
-### 2. Backend (example Node.js)
+### 2. Backend (Node.js)
 
 ```bash
+# Navigate to your frontend directory
 cd backend
-npm install
-npm run dev
-```
-### 3. Frontend (example React)
 
+# Open or create the .env file
+nano .env
+
+# Add the following lines inside .env
+DB_HOST=postgres  # Use container name in Docker, or localhost for local dev
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=usersdb
+DB_PORT=5432
+PORT=5000
+
+Notes:
+- "DB_HOST is the PostgreSQL hostname. If using Docker, it’s the container name (postgres)." 
+- "Incase if you are using local. it's the container name is (localhost)."
+- "PORT is where your backend server listens."
+```
 ```bash
-cd frontend
 npm install
 npm start
 ```
-### 4. Database (example PostgreSQL)
+### 3. Frontend (React)
 
 ```bash
-docker run --name dev-postgres \
-  -p 5432:5432 \
-  -e POSTGRES_PASSWORD=mypassword \
-  -d postgres:15
+# Navigate to your frontend directory
+cd frontend
+
+# Open or create the .env file
+nano .env
+
+# Add the following lines inside .env
+REACT_APP_API=http://0.0.0.0:5000
+HOST=0.0.0.0
+DANGEROUSLY_DISABLE_HOST_CHECK=true
+
+Notes:
+- "For local dev, you can use http://localhost:5000."
+- "If you later deploy to AKS or another server, replace it with the backend service URL."
+- "DANGEROUSLY_DISABLE_HOST_CHECK=true is only recommended for local development; avoid using it in production."
+```
+```bash
+npm install
+npm start
+```
+### 4. Database Auto Table Creation (SQL in backend)
+
+- Include this snippet in server.js before your routes:
+
+```bash
+CREATE TABLE IF NOT EXISTS users(
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100),
+  email VARCHAR(100) UNIQUE
+);
+
+- This ensures the users table is automatically created when the backend starts.
+- No manual SQL commands needed.
+```
+
+### 5. Database (example PostgreSQL)
+
+```bash
+   docker run -d \
+   --name postgres-db \
+   -e POSTGRES_USER=postgres \
+   -e POSTGRES_PASSWORD=postgres \
+   -e POSTGRES_DB=usersdb \
+   -p 5432:5432 \
+   postgres:15
+
+- Backend .env must have DB_HOST=postgres when using Docker network.
+- Frontend .env uses relative path or http://0.0.0.0:5000.
 ```  
-### 5. check url for backend
+### 6. check url for backend
 
 ```bash
 http://localhost:5000/api/users
 ```
 
-### 6. check url for frontend
+### 7. check url for frontend
 
 ```bash
-http://localhost:80
+http://localhost:3000
 ```
 ## Deploying to Kubernetes via Github Actions (via CI/CD)
 
